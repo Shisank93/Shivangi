@@ -28,8 +28,8 @@
     <!-- Firebase SDKs -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, signOut, onAuthStateChanged, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, addDoc, onSnapshot, collection, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         setLogLevel('debug');
 
@@ -56,98 +56,50 @@
             console.error("Firebase initialization error:", e);
         }
 
-        const loginSection = document.getElementById('login-section');
         const chatSection = document.getElementById('chat-section');
         const chatContainer = document.getElementById('chat-container');
         const messageForm = document.getElementById('message-form');
         const messageInput = document.getElementById('message-input');
         const logoutButton = document.getElementById('logout-button');
         const userIdDisplay = document.getElementById('user-id-display');
-        const googleSignInButton = document.getElementById('google-sign-in-button');
 
         let unsubscribeFromChat;
-
-        // A custom modal for displaying messages
-        function showCustomModal(message, title = "Message") {
-            const modal = document.createElement('div');
-            modal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-50';
-            modal.innerHTML = `
-                <div class="bg-white rounded-xl p-6 shadow-2xl max-w-sm w-full text-center">
-                    <h2 class="text-xl font-bold mb-2">${title}</h2>
-                    <p class="text-lg text-gray-700">${message}</p>
-                    <button class="mt-4 px-6 py-2 bg-blue-500 text-white rounded-full hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400">OK</button>
-                </div>
-            `;
-            document.body.appendChild(modal);
-            modal.querySelector('button').addEventListener('click', () => {
-                document.body.removeChild(modal);
-            });
-        }
         
-        // Listen for authentication state changes
+        // Initial authentication with the provided token or anonymously
         onAuthStateChanged(auth, async (user) => {
-            if (user) {
-                console.log("User is authenticated:", user.uid);
-                userIdDisplay.textContent = `User ID: ${user.uid}`;
-                loginSection.classList.add('hidden');
-                chatSection.classList.remove('hidden');
-                
-                if (unsubscribeFromChat) {
-                    unsubscribeFromChat();
-                }
+            if (!user) {
+                 await signInAnonymously(auth);
+            }
 
-                // Listen for new messages in real-time
-                const chatRef = collection(db, `/artifacts/${appId}/public/data/messages`);
-                const q = query(chatRef);
-                
-                unsubscribeFromChat = onSnapshot(q, (snapshot) => {
-                    chatContainer.innerHTML = '';
-                    snapshot.forEach((doc) => {
-                        const message = doc.data();
-                        const isMyMessage = message.userId === user.uid;
-                        const messageElement = document.createElement('div');
-                        messageElement.className = `p-3 rounded-xl max-w-xs ${isMyMessage ? 'bg-blue-500 text-white ml-auto' : 'bg-gray-300 text-gray-800 mr-auto'}`;
-                        messageElement.innerHTML = `
-                            <div class="font-bold text-sm">${message.userId}</div>
-                            <div class="text-sm">${message.text}</div>
-                        `;
-                        chatContainer.prepend(messageElement);
-                    });
-                }, (error) => {
-                    console.error("Failed to get messages:", error);
-                    showCustomModal('Failed to load messages.');
+            // User is now authenticated (anonymously or via custom token)
+            console.log("User is authenticated:", user.uid);
+            userIdDisplay.textContent = `User ID: ${user.uid}`;
+            chatSection.classList.remove('hidden');
+            
+            if (unsubscribeFromChat) {
+                unsubscribeFromChat();
+            }
+
+            // Listen for new messages in real-time
+            const chatRef = collection(db, `/artifacts/${appId}/public/data/messages`);
+            const q = query(chatRef);
+            
+            unsubscribeFromChat = onSnapshot(q, (snapshot) => {
+                chatContainer.innerHTML = '';
+                snapshot.forEach((doc) => {
+                    const message = doc.data();
+                    const isMyMessage = message.userId === user.uid;
+                    const messageElement = document.createElement('div');
+                    messageElement.className = `p-3 rounded-xl max-w-xs ${isMyMessage ? 'bg-blue-500 text-white ml-auto' : 'bg-gray-300 text-gray-800 mr-auto'}`;
+                    messageElement.innerHTML = `
+                        <div class="font-bold text-sm">${message.userId}</div>
+                        <div class="text-sm">${message.text}</div>
+                    `;
+                    chatContainer.prepend(messageElement);
                 });
-
-            } else {
-                console.log("No user is authenticated.");
-                loginSection.classList.remove('hidden');
-                chatSection.classList.add('hidden');
-                if (unsubscribeFromChat) {
-                    unsubscribeFromChat();
-                }
-            }
-        });
-        
-        // Initial authentication with the provided token
-        if (initialAuthToken) {
-            signInWithCustomToken(auth, initialAuthToken).catch((error) => {
-                console.error("Custom token sign-in failed:", error);
-                signInAnonymously(auth); // Fallback to anonymous sign-in if token fails
+            }, (error) => {
+                console.error("Failed to get messages:", error);
             });
-        } else {
-            signInAnonymously(auth);
-        }
-
-        // Handle Google Sign-in
-        googleSignInButton.addEventListener('click', async () => {
-            const provider = new GoogleAuthProvider();
-            try {
-                await signInWithPopup(auth, provider);
-                showCustomModal("Login successful!", "Success");
-            } catch (error) {
-                console.error("Google sign-in error:", error);
-                showCustomModal("Sign-in failed. Please try again.", "Error");
-            }
         });
 
         // Handle new message submission
@@ -167,7 +119,6 @@
                     messageInput.value = '';
                 } catch (error) {
                     console.error("Error sending message:", error);
-                    showCustomModal("Failed to send message. Please try again.");
                 }
             }
         });
@@ -176,29 +127,17 @@
         logoutButton.addEventListener('click', async () => {
             try {
                 await signOut(auth);
-                showCustomModal("You have been logged out.", "Logged Out");
             } catch (error) {
                 console.error("Logout error:", error);
-                showCustomModal("Failed to log out. Please try again.");
             }
         });
-
     </script>
 
     <!-- Main Card Container -->
     <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md sm:max-w-xl md:max-w-2xl lg:max-w-3xl flex flex-col items-center">
 
-        <!-- Login Section -->
-        <div id="login-section" class="w-full text-center">
-            <h1 class="text-3xl font-bold text-gray-800 mb-6">Welcome to Your Private Chat</h1>
-            <p class="text-sm text-gray-500 mb-6">Sign in with your Google account to access the group chat.</p>
-            <button id="google-sign-in-button" class="w-full bg-white text-gray-700 font-bold py-3 px-6 rounded-full border border-gray-300 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400 transition transform hover:scale-105 flex items-center justify-center">
-                <i class="fab fa-google mr-3"></i> Sign in with Google
-            </button>
-        </div>
-
-        <!-- Chat Section (hidden initially) -->
-        <div id="chat-section" class="w-full hidden">
+        <!-- Chat Section (visible by default) -->
+        <div id="chat-section" class="w-full">
             <div class="flex justify-between items-center mb-4">
                 <h1 class="text-3xl font-bold text-gray-800">Group Chat</h1>
                 <button id="logout-button" class="text-sm text-blue-500 hover:text-blue-700 font-medium">Log out</button>
