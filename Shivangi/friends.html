@@ -71,11 +71,12 @@
         let unsubscribeFromChat;
 
         // A custom modal for displaying messages
-        function showCustomModal(message) {
+        function showCustomModal(message, title = "Message") {
             const modal = document.createElement('div');
             modal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-50';
             modal.innerHTML = `
                 <div class="bg-white rounded-xl p-6 shadow-2xl max-w-sm w-full text-center">
+                    <h2 class="text-xl font-bold mb-2">${title}</h2>
                     <p class="text-lg text-gray-700">${message}</p>
                     <button class="mt-4 px-6 py-2 bg-blue-500 text-white rounded-full hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400">OK</button>
                 </div>
@@ -149,9 +150,11 @@
             
             try {
                 await signInWithEmailAndPassword(auth, email, password);
+                showCustomModal("Login successful!", "Success");
             } catch (error) {
                 console.error("Login error:", error);
                 errorMessage.textContent = 'Login failed. Check your email and password.';
+                showCustomModal("Login failed. Please check your email and password.", "Error");
             }
         });
 
@@ -163,18 +166,13 @@
             errorMessage.textContent = '';
             
             try {
-                // Check if the email is in the authorized list
-                const authorizedUserRef = doc(db, `/artifacts/${appId}/public/data/authorized_users/${email}`);
-                const docSnap = await getDoc(authorizedUserRef);
-
-                if (docSnap.exists()) {
-                    await createUserWithEmailAndPassword(auth, email, password);
-                } else {
-                    errorMessage.textContent = 'Sign up failed. Your email is not on the authorized user list.';
-                }
+                // Anyone can sign up. The whitelist logic has been removed.
+                await createUserWithEmailAndPassword(auth, email, password);
+                showCustomModal("Account created successfully! You can now log in.", "Success");
             } catch (error) {
                 console.error("Signup error:", error);
-                errorMessage.textContent = 'Signup failed. ' + error.message;
+                errorMessage.textContent = 'Signup failed: ' + error.message;
+                showCustomModal("Signup failed: " + error.message, "Error");
             }
         });
 
@@ -204,6 +202,7 @@
         logoutButton.addEventListener('click', async () => {
             try {
                 await signOut(auth);
+                showCustomModal("You have been logged out.", "Logged Out");
             } catch (error) {
                 console.error("Logout error:", error);
                 showCustomModal("Failed to log out. Please try again.");
