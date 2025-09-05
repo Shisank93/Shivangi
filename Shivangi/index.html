@@ -34,10 +34,6 @@
         import { firebaseConfig } from './firebase-config.js';
         setLogLevel('debug');
 
-        // Global variables for Firebase configuration
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
         // Initialize Firebase
         let app, db, auth;
         try {
@@ -91,7 +87,7 @@
                 }
 
                 // Listen for new messages in real-time
-                const chatRef = collection(db, `/artifacts/${appId}/public/data/messages`);
+                const chatRef = collection(db, "messages");
                 const q = query(chatRef);
 
                 unsubscribeFromChat = onSnapshot(q, (snapshot) => {
@@ -129,7 +125,7 @@
                     const userSnap = await getDoc(userRef);
                     const userAge = userSnap.exists() ? userSnap.data().age : 'N/A';
 
-                    const messagesRef = collection(db, `/artifacts/${appId}/public/data/messages`);
+                    const messagesRef = collection(db, "messages");
                     await addDoc(messagesRef, {
                         userId: user.uid,
                         displayName: user.displayName,
