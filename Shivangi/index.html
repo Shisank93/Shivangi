@@ -61,7 +61,7 @@
                 chatSection.classList.remove('hidden');
 
                 // Check if user data exists in Firestore
-                const userRef = doc(db, 'users', user.uid);
+                const userRef = doc(db, 'artifacts', firebaseConfig.appId, 'public', 'data', 'users', user.uid);
                 const userSnap = await getDoc(userRef);
 
                 if (!userSnap.exists()) {
@@ -87,7 +87,7 @@
                 }
 
                 // Listen for new messages in real-time
-                const chatRef = collection(db, "messages");
+                const chatRef = collection(db, 'artifacts', firebaseConfig.appId, 'public', 'data', 'messages');
                 const q = query(chatRef);
 
                 unsubscribeFromChat = onSnapshot(q, (snapshot) => {
@@ -121,11 +121,11 @@
             if (user && messageText !== '') {
                 try {
                     // Get user's age from Firestore
-                    const userRef = doc(db, 'users', user.uid);
+                    const userRef = doc(db, 'artifacts', firebaseConfig.appId, 'public', 'data', 'users', user.uid);
                     const userSnap = await getDoc(userRef);
                     const userAge = userSnap.exists() ? userSnap.data().age : 'N/A';
 
-                    const messagesRef = collection(db, "messages");
+                    const messagesRef = collection(db, 'artifacts', firebaseConfig.appId, 'public', 'data', 'messages');
                     await addDoc(messagesRef, {
                         userId: user.uid,
                         displayName: user.displayName,
