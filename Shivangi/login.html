@@ -13,16 +13,28 @@
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f3f4f6;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
         }
     </style>
 </head>
-<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+<body class="bg-gradient-to-br from-purple-600 to-blue-500 flex items-center justify-center min-h-screen p-4">
 
     <!-- Login Card Container -->
-    <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm">
-        <h1 class="text-3xl font-bold text-gray-800 text-center mb-6">Group Chat Login</h1>
-        <button id="login-button" class="w-full bg-red-500 text-white font-bold py-3 px-6 rounded-lg hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-400 transition transform hover:scale-105 flex items-center justify-center">
+    <div class="glass-card rounded-2xl shadow-2xl p-8 w-full max-w-sm text-white">
+        <div class="text-center mb-8">
+            <i class="fas fa-comments fa-3x text-white"></i>
+            <h1 class="text-4xl font-bold mt-4">ChitChat</h1>
+            <p class="text-sm opacity-80">Seamlessly connect and collaborate.</p>
+        </div>
+        <div id="error-message" class="text-red-400 text-center mt-4 text-sm font-bold"></div>
+        <div id="loading-spinner" class="hidden text-center mt-4">
+            <i class="fas fa-spinner fa-spin fa-2x"></i>
+        </div>
+        <button id="login-button" class="w-full bg-white text-blue-600 font-bold py-3 px-6 rounded-lg hover:bg-opacity-90 focus:outline-none focus:ring-2 focus:ring-white transition transform hover:-translate-y-1 flex items-center justify-center mt-4">
             <i class="fab fa-google mr-3"></i>
             <span>Sign in with Google</span>
         </button>
@@ -39,28 +51,35 @@
         const provider = new GoogleAuthProvider();
 
         const loginButton = document.getElementById('login-button');
+        const errorMessage = document.getElementById('error-message');
+        const loadingSpinner = document.getElementById('loading-spinner');
 
         loginButton.addEventListener('click', () => {
+            errorMessage.textContent = '';
+            loadingSpinner.classList.remove('hidden');
+            loginButton.classList.add('hidden');
+
             signInWithPopup(auth, provider)
                 .then((result) => {
-                    // This gives you a Google Access Token. You can use it to access the Google API.
-                    const credential = GoogleAuthProvider.credentialFromResult(result);
-                    const token = credential.accessToken;
-                    // The signed-in user info.
-                    const user = result.user;
-                    // IdP data available using getAdditionalUserInfo(result)
-                    // ...
                     window.location.href = 'index.html';
                 }).catch((error) => {
-                    // Handle Errors here.
-                    const errorCode = error.code;
-                    const errorMessage = error.message;
-                    // The email of the user's account used.
-                    const email = error.customData.email;
-                    // The AuthCredential type that was used.
-                    const credential = GoogleAuthProvider.credentialFromError(error);
-                    console.error(errorCode, errorMessage, email, credential);
-                    // ...
+                    let friendlyMessage = "An unexpected error occurred. Please try again.";
+                    switch (error.code) {
+                        case 'auth/popup-closed-by-user':
+                            friendlyMessage = "Login cancelled. Please try again.";
+                            break;
+                        case 'auth/network-request-failed':
+                            friendlyMessage = "Network error. Please check your connection.";
+                            break;
+                        case 'auth/cancelled-popup-request':
+                            friendlyMessage = ""; // User cancelled the popup, no message needed
+                            break;
+                    }
+                    console.error("Login Error:", error);
+                    errorMessage.textContent = friendlyMessage;
+                }).finally(() => {
+                    loadingSpinner.classList.add('hidden');
+                    loginButton.classList.remove('hidden');
                 });
         });
     </script>
