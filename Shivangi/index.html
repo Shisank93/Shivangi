@@ -13,36 +13,30 @@
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f3f4f6;
+            background-color: #f7fafc;
         }
         .chat-container {
-            height: calc(100vh - 12rem);
+            height: calc(100vh - 14rem); /* Adjusted height */
             overflow-y: auto;
             display: flex;
-            flex-direction: column-reverse;
+            flex-direction: column; /* Changed to column */
+            gap: 1rem;
         }
     </style>
 </head>
-<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+<body class="bg-gray-100">
 
     <!-- Firebase SDKs -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, addDoc, onSnapshot, collection, query, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, addDoc, onSnapshot, collection, query, doc, getDoc, setDoc, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { firebaseConfig } from './firebase-config.js';
-        setLogLevel('debug');
 
         // Initialize Firebase
-        let app, db, auth;
-        try {
-            app = initializeApp(firebaseConfig);
-            db = getFirestore(app);
-            auth = getAuth(app);
-        } catch (e) {
-            console.error("Firebase initialization error:", e);
-        }
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
 
         const chatSection = document.getElementById('chat-section');
         const chatContainer = document.getElementById('chat-container');
@@ -50,6 +44,11 @@
         const messageInput = document.getElementById('message-input');
         const logoutButton = document.getElementById('logout-button');
         const userIdDisplay = document.getElementById('user-id-display');
+        const voiceCallButton = document.getElementById('voice-call-button');
+        const videoCallButton = document.getElementById('video-call-button');
+
+        voiceCallButton.addEventListener('click', () => alert('Voice call feature coming soon!'));
+        videoCallButton.addEventListener('click', () => alert('Video call feature coming soon!'));
 
         let unsubscribeFromChat;
         
@@ -60,25 +59,15 @@
                 userIdDisplay.textContent = `Logged in as: ${user.displayName}`;
                 chatSection.classList.remove('hidden');
 
-                // Check if user data exists in Firestore
-                const userRef = doc(db, 'artifacts', firebaseConfig.appId, 'public', 'data', 'users', user.uid);
+                // Check if user data exists in Firestore, if not, create it
+                const userRef = doc(db, 'users', user.uid);
                 const userSnap = await getDoc(userRef);
 
                 if (!userSnap.exists()) {
-                    // New user, prompt for age
-                    let age = null;
-                    while (!age || isNaN(age) || age <= 0) {
-                        const ageString = prompt("Welcome! Please enter your age:");
-                        if (ageString) {
-                            age = parseInt(ageString, 10);
-                        }
-                    }
-
-                    // Store user info in Firestore
+                    // New user, store basic info
                     await setDoc(userRef, {
                         displayName: user.displayName,
-                        email: user.email,
-                        age: age
+                        email: user.email
                     });
                 }
 
@@ -86,9 +75,9 @@
                     unsubscribeFromChat();
                 }
 
-                // Listen for new messages in real-time
-                const chatRef = collection(db, 'artifacts', firebaseConfig.appId, 'public', 'data', 'messages');
-                const q = query(chatRef);
+                // Listen for new messages in real-time, ordered by timestamp
+                const messagesRef = collection(db, 'messages');
+                const q = query(messagesRef, orderBy('timestamp', 'asc')); // Changed to asc
 
                 unsubscribeFromChat = onSnapshot(q, (snapshot) => {
                     chatContainer.innerHTML = '';
@@ -96,13 +85,24 @@
                         const message = doc.data();
                         const isMyMessage = message.userId === user.uid;
                         const messageElement = document.createElement('div');
-                        messageElement.className = `p-3 rounded-xl max-w-xs ${isMyMessage ? 'bg-blue-500 text-white ml-auto' : 'bg-gray-300 text-gray-800 mr-auto'}`;
+
+                        const messageDate = new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+                        messageElement.className = `flex items-start gap-3 ${isMyMessage ? 'flex-row-reverse' : ''}`;
                         messageElement.innerHTML = `
-                            <div class="font-bold text-sm">${message.displayName} (Age: ${message.age})</div>
-                            <div class="text-sm">${message.text}</div>
+                            <img src="https://i.pravatar.cc/40?u=${message.userId}" class="w-8 h-8 rounded-full">
+                            <div class="flex flex-col">
+                                <div class="p-3 rounded-xl max-w-xs ${isMyMessage ? 'bg-blue-600 text-white rounded-br-none' : 'bg-gray-200 text-gray-800 rounded-bl-none'}">
+                                    <div class="font-bold text-sm">${message.displayName}</div>
+                                    <div class="text-sm mt-1">${message.text}</div>
+                                </div>
+                                <div class="text-xs opacity-70 mt-1 px-2 ${isMyMessage ? 'text-right' : 'text-left'}">${messageDate}</div>
+                            </div>
                         `;
-                        chatContainer.prepend(messageElement);
+                        chatContainer.appendChild(messageElement);
                     });
+                    // Scroll to the bottom
+                    chatContainer.scrollTop = chatContainer.scrollHeight;
                 }, (error) => {
                     console.error("Failed to get messages:", error);
                 });
@@ -120,18 +120,12 @@
 
             if (user && messageText !== '') {
                 try {
-                    // Get user's age from Firestore
-                    const userRef = doc(db, 'artifacts', firebaseConfig.appId, 'public', 'data', 'users', user.uid);
-                    const userSnap = await getDoc(userRef);
-                    const userAge = userSnap.exists() ? userSnap.data().age : 'N/A';
-
-                    const messagesRef = collection(db, 'artifacts', firebaseConfig.appId, 'public', 'data', 'messages');
+                    const messagesRef = collection(db, 'messages');
                     await addDoc(messagesRef, {
                         userId: user.uid,
                         displayName: user.displayName,
                         text: messageText,
-                        timestamp: Date.now(),
-                        age: userAge
+                        timestamp: Date.now()
                     });
                     messageInput.value = '';
                 } catch (error) {
@@ -150,29 +144,42 @@
         });
     </script>
 
-    <!-- Main Card Container -->
-    <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md sm:max-w-xl md:max-w-2xl lg:max-w-3xl flex flex-col items-center">
+    <!-- Main App Container -->
+    <div class="flex flex-col h-screen w-full max-w-4xl mx-auto bg-white shadow-2xl rounded-lg">
 
-        <!-- Chat Section (visible by default) -->
-        <div id="chat-section" class="w-full">
-            <div class="flex justify-between items-center mb-4">
-                <h1 class="text-3xl font-bold text-gray-800">Group Chat</h1>
-                <button id="logout-button" class="text-sm text-blue-500 hover:text-blue-700 font-medium">Log out</button>
+        <!-- Header -->
+        <header class="flex items-center justify-between p-4 border-b bg-gray-50 rounded-t-lg">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-800">Community Chat</h1>
+                <div class="text-xs text-gray-400 break-words" id="user-id-display"></div>
             </div>
-            <div class="mb-4 text-xs text-gray-400 break-words" id="user-id-display"></div>
-            
-            <div id="chat-container" class="w-full bg-gray-50 rounded-xl p-4 space-y-4 shadow-inner chat-container mb-4">
-                <!-- Chat messages will be dynamically added here -->
+            <div class="flex items-center gap-3">
+                <button id="voice-call-button" class="text-gray-500 hover:text-blue-600 transition">
+                    <i class="fas fa-phone-alt fa-lg"></i>
+                </button>
+                <button id="video-call-button" class="text-gray-500 hover:text-blue-600 transition">
+                    <i class="fas fa-video fa-lg"></i>
+                </button>
+                <button id="logout-button" class="text-sm text-red-500 hover:text-red-700 font-medium">Log out</button>
             </div>
+        </header>
 
-            <form id="message-form" class="w-full flex">
-                <input id="message-input" type="text" placeholder="Type a message..." required class="flex-grow px-4 py-3 border border-gray-300 rounded-l-full focus:outline-none focus:ring-2 focus:ring-blue-400">
-                <button type="submit" class="bg-blue-500 text-white font-bold py-3 px-6 rounded-r-full hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400 transition transform hover:scale-105">
+        <!-- Chat Section -->
+        <main id="chat-section" class="flex-1 p-4 overflow-y-auto">
+            <div id="chat-container" class="w-full h-full space-y-4">
+                <!-- Messages will be dynamically added here -->
+            </div>
+        </main>
+
+        <!-- Message Input -->
+        <footer class="p-4 bg-gray-50 border-t rounded-b-lg">
+            <form id="message-form" class="w-full flex items-center gap-3">
+                <input id="message-input" type="text" placeholder="Type a message..." required class="flex-grow px-4 py-3 border bg-gray-100 border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-400">
+                <button type="submit" class="bg-blue-600 text-white font-bold p-3 rounded-full hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 transition transform hover:scale-110">
                     <i class="fas fa-paper-plane"></i>
                 </button>
             </form>
-        </div>
-
+        </footer>
     </div>
 
 </body>
